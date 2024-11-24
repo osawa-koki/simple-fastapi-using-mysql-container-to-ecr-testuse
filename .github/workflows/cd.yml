@@ -55,13 +55,13 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Set ECR repository URI
         run: |
-          export ECR_REPOSITORY_URI=$(aws ecr describe-repositories --repository-names fastapi-db-app --query 'repositories[0].repositoryUri' --output text)
+          export ECR_REPOSITORY_URI=$(aws ecr describe-repositories --repository-names fastapi-db-testuse-app --query 'repositories[0].repositoryUri' --output text)
           echo "ECR_REPOSITORY_URI=$ECR_REPOSITORY_URI" >> $GITHUB_ENV
       - name: Login
         run: aws ecr get-login-password | docker login --username AWS --password-stdin ${{ env.ECR_REPOSITORY_URI }}
       - name: Build
-        run: docker build -t fastapi-db-app .
+        run: docker build -t fastapi-db-testuse-app .
       - name: Tag
-        run: docker tag fastapi-db-app:latest ${{ env.ECR_REPOSITORY_URI }}:latest
+        run: docker tag fastapi-db-testuse-app:latest ${{ env.ECR_REPOSITORY_URI }}:latest
       - name: Push
         run: docker push ${{ env.ECR_REPOSITORY_URI }}:latest
