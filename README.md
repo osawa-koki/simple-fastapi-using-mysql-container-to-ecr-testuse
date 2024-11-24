@@ -73,3 +73,11 @@ aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_R
 
 docker run --rm -p 80:80 --name fastapi-db-testuse-app -e DB_HOST=$(ipconfig getifaddr en0) -e DB_PORT=3306 -e DB_USERNAME=root -e DB_PASSWORD=rootpassword $(echo $ECR_REPOSITORY_URI):latest
 ```
+
+以下のリクエストを送信して、DBの作成を行ってください。  
+
+```bash
+curl -X POST "http://localhost/databases" \
+    -H "Content-Type: application/json" \
+    -d '{"database": "your_database_name"}'
+```
