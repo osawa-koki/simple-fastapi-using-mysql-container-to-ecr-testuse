@@ -1,0 +1,67 @@
+name: cd
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v-*' ]
+
+jobs:
+  infra:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Cache node_modules
+        id: node_modules_cache_id
+        uses: actions/cache@v4
+        with:
+          path: ./node_modules/
+          key: node-modules-${{ hashFiles('./**/package-lock.json') }}
+      - name: Install dependencies
+        if: steps.node_modules_cache_id.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Install CDK
+        run: npm install --global aws-cdk
+      - name: Synth
+        run: cdk synth
+      - name: Bootstrap
+        run: cdk bootstrap
+      - name: Deploy
+        run: cdk deploy
+  app:
+    runs-on: ubuntu-22.04
+    needs: infra
+    defaults:
+      run:
+        working-directory: ./fastapi-app/
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Set ECR repository URI
+        run: |
+          export ECR_REPOSITORY_URI=$(aws ecr describe-repositories --repository-names fastapi-db-app --query 'repositories[0].repositoryUri' --output text)
+          echo "ECR_REPOSITORY_URI=$ECR_REPOSITORY_URI" >> $GITHUB_ENV
+      - name: Login
+        run: aws ecr get-login-password | docker login --username AWS --password-stdin ${{ env.ECR_REPOSITORY_URI }}
+      - name: Build
+        run: docker build -t fastapi-db-app .
+      - name: Tag
+        run: docker tag fastapi-db-app:latest ${{ env.ECR_REPOSITORY_URI }}:latest
+      - name: Push
+        run: docker push ${{ env.ECR_REPOSITORY_URI }}:latest
